@@ -120,6 +120,48 @@
       font-size: 0.9rem;
     }
 
+    .work-hours {
+      margin: 16px 0 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .work-hours legend {
+      padding: 0 4px;
+      color: var(--navy);
+      font-weight: bold;
+    }
+
+    .work-hours-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .work-hours label {
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+    }
+
+    .work-hours input {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px;
+      border: 1px solid #abb8c2;
+      border-radius: 5px;
+      color: #1f2d38;
+      font: inherit;
+    }
+
+    .work-hours-error {
+      min-height: 1.5em;
+      margin: 8px 0 0;
+      color: var(--red);
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
     h2 {
       margin-top: 0;
       color: var(--navy);
@@ -337,6 +379,20 @@
           <option value="Concrete Pours">Concrete Pours</option>
           <option value="Roofing">Roofing</option>
         </select>
+        <fieldset class="work-hours" aria-describedby="workHoursError">
+          <legend>Crew work hours (jobsite local time)</legend>
+          <div class="work-hours-fields">
+            <div>
+              <label for="workStart">Start time</label>
+              <input id="workStart" type="time" value="07:00" required>
+            </div>
+            <div>
+              <label for="workEnd">End time</label>
+              <input id="workEnd" type="time" value="17:00" required>
+            </div>
+          </div>
+          <p id="workHoursError" class="work-hours-error" role="alert" aria-live="polite"></p>
+        </fieldset>
         <p class="activity-note">Select a location on the map to load its forecast and activity ratings.</p>
       </div>
     </section>
@@ -371,8 +427,11 @@
     const detailsContent = document.getElementById("detailsContent");
     const selectedCoordinates = document.getElementById("selectedCoordinates");
     const forecastStatus = document.getElementById("forecastStatus");
-    const WORK_START_HOUR = 7;
-    const WORK_END_HOUR = 17;
+    const workStartInput = document.getElementById("workStart");
+    const workEndInput = document.getElementById("workEnd");
+    const workHoursError = document.getElementById("workHoursError");
+    let workStartMinutes = 7 * 60;
+    let workEndMinutes = 17 * 60;
     const CRANE_WIND_LIMIT = 20;
     const CRANE_GUST_LIMIT = 25;
     let selectedDayIndex = 0;
@@ -419,6 +478,46 @@
       return formattedValue === "Unavailable" ? formattedValue : formattedValue + unit;
     }
 
+    function parseTimeInMinutes(value) {
+      const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+      return match === null ? null : Number(match[1]) * 60 + Number(match[2]);
+    }
+
+    function formatWorkTime(minutes) {
+      const hour = Math.floor(minutes / 60);
+      const minute = String(minutes % 60).padStart(2, "0");
+      const displayHour = hour % 12 || 12;
+      return displayHour + ":" + minute + (hour < 12 ? " AM" : " PM");
+    }
+
+    function getWorkHoursDescription() {
+      return formatWorkTime(workStartMinutes) + " inclusive to " +
+        formatWorkTime(workEndMinutes) + " exclusive";
+    }
+
+    function updateWorkHours() {
+      const start = parseTimeInMinutes(workStartInput.value);
+      const end = parseTimeInMinutes(workEndInput.value);
+
+      if (start === null || end === null) {
+        workHoursError.textContent =
+          "Enter both a valid start time and end time. Ratings will keep using the previous valid hours.";
+      } else if (end <= start) {
+        workHoursError.textContent =
+          "End time must be later than start time. Overnight or empty work-hour ranges are not allowed; ratings will keep using the previous valid hours.";
+      } else {
+        workStartMinutes = start;
+        workEndMinutes = end;
+        workHoursError.textContent = "";
+        renderForecast();
+        renderDetails();
+      }
+
+      const inputsAreInvalid = start === null || end === null || end <= start;
+      workStartInput.setAttribute("aria-invalid", String(inputsAreInvalid));
+      workEndInput.setAttribute("aria-invalid", String(inputsAreInvalid));
+    }
+
     function getRatingClass(rating) {
       if (rating === "Go") {
         return "rating-go";
@@ -433,12 +532,31 @@
     }
 
     function getWorkHourValues(day, property) {
+      const expectedHourStarts = [];
+      for (let hour = 0; hour < 24; hour += 1) {
+        const hourStartMinutes = hour * 60;
+        // Include each hourly forecast period that overlaps the selected work range.
+        if (hourStartMinutes < workEndMinutes &&
+            hourStartMinutes + 60 > workStartMinutes) {
+          expectedHourStarts.push(hour);
+        }
+      }
+
       const workHours = day.hours.filter(function (hour) {
+        if (typeof hour.time !== "string") {
+          return false;
+        }
+
         const hourOfDay = Number(hour.time.slice(11, 13));
-        return hourOfDay >= WORK_START_HOUR && hourOfDay < WORK_END_HOUR;
+        const minuteOfHour = Number(hour.time.slice(14, 16));
+        return minuteOfHour === 0 && expectedHourStarts.indexOf(hourOfDay) !== -1;
       });
 
-      if (workHours.length !== WORK_END_HOUR - WORK_START_HOUR) {
+      const foundHourStarts = new Set(workHours.map(function (hour) {
+        return Number(hour.time.slice(11, 13));
+      }));
+      if (workHours.length !== expectedHourStarts.length ||
+          foundHourStarts.size !== expectedHourStarts.length) {
         return null;
       }
 
@@ -461,7 +579,8 @@
         if (windSpeeds === null || gustSpeeds === null) {
           return {
             rating: "Unavailable",
-            explanation: "Hourly sustained wind and gust data must be available for every work hour from 7:00 AM through 4:00 PM local time."
+            explanation: "Hourly sustained wind and gust data must be available for every forecast period overlapping the selected work hours (" +
+              getWorkHoursDescription() + ", jobsite local time)."
           };
         }
 
@@ -511,7 +630,8 @@
         if (temperatures === null) {
           return {
             rating: "Unavailable",
-            explanation: "Hourly temperature data must be available for every work hour from 7:00 AM through 4:00 PM local time."
+            explanation: "Hourly temperature data must be available for every forecast period overlapping the selected work hours (" +
+              getWorkHoursDescription() + ", jobsite local time)."
           };
         }
 
@@ -546,7 +666,8 @@
       if (precipitationProbabilities === null) {
         return {
           rating: "Unavailable",
-          explanation: "Hourly precipitation probability must be available for every work hour from 7:00 AM through 4:00 PM local time."
+          explanation: "Hourly precipitation probability must be available for every forecast period overlapping the selected work hours (" +
+            getWorkHoursDescription() + ", jobsite local time)."
         };
       }
 
@@ -710,7 +831,8 @@
       detailsContent.appendChild(explanation);
 
       const workHours = document.createElement("p");
-      workHours.textContent = "Rating work hours: 7:00 AM through 4:00 PM local time (5:00 PM excluded).";
+      workHours.textContent = "Rating work hours: " + getWorkHoursDescription() +
+        ", local jobsite time.";
       detailsContent.appendChild(workHours);
 
       const summary = document.createElement("div");
@@ -905,6 +1027,9 @@
       renderForecast();
       renderDetails();
     });
+
+    workStartInput.addEventListener("change", updateWorkHours);
+    workEndInput.addEventListener("change", updateWorkHours);
 
     renderForecast();
     renderDetails();

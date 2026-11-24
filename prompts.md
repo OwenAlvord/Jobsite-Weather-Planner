@@ -159,3 +159,27 @@ Use the hand-worked examples and boundary tests in `spec.md` to verify the calcu
 Fix any problems you find. Do not add new features or change the approved requirements.
 
 Record my exact request in `prompts.md`. Explain what passed, what failed, and what you fixed. Do not commit changes yourself.
+
+## Extra Feature 1: Custom Crew Work Hours
+
+Read `AGENTS.md` and `spec.md` before making changes.
+
+Build Extra Feature 1: Custom Crew Work Hours.
+
+Requirements:
+
+- Add a clear start-time and end-time setting to the Jobsite Weather Planner.
+- Default to 7:00 AM through 5:00 PM.
+- Let users change both times.
+- Recalculate all seven daily activity ratings using the selected work hours.
+- Apply the selected hours to Crane Lifts, Concrete Pours, and Roofing.
+- Use the jobsite’s local timezone.
+- Make the start time inclusive and the end time exclusive.
+- Validate the times and prevent invalid or empty work-hour ranges.
+- Keep the existing map, weather forecast, activity ratings, and explanations working.
+- Reset to the default hours when the page is refreshed, as specified.
+- Keep the app in the single `index.html` file.
+- Do not build the printable daily field brief yet.
+Record my exact request in `prompts.md`. Test the feature, including changing the hours and checking that all three activity ratings update correctly. Explain how I can test it myself.
+
+Do not commit anything yet.
