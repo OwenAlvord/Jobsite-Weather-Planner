@@ -76,3 +76,62 @@ Requirements:
 - Do not add either extra feature yet.
 - Keep the app in the single `index.html` file.
 Record my exact request in `prompts.md`. Test the changes and explain how I can check that the weather data is updating correctly.
+
+## Stage 4 Weather Calculations
+
+Read `AGENTS.md` and `spec.md` before making changes.
+
+Build Stage 4: Implement the weather calculations and Go, Caution, and No-Go ratings.
+
+Requirements:
+
+**Crane Lifts**
+
+- Evaluate the highest hourly sustained wind speed and highest hourly wind gust during the work hours.
+- Default sustained wind limit: 20 mph.
+- Default wind gust limit: 25 mph.
+- Go: both wind measurements are below 80% of their limits.
+- Caution: either measurement is at least 80% of its limit but remains below its limit.
+- No-Go: either measurement reaches or exceeds its limit.
+**Concrete Pours**
+
+- Evaluate hourly temperatures during work hours.
+- Go: all temperatures are above 40°F.
+- Caution: any temperature is above 32°F and at or below 40°F.
+- No-Go: any temperature is at or below 32°F.
+**Roofing**
+
+- Evaluate the highest hourly precipitation probability during work hours.
+- Go: below 20%.
+- Caution: 20% through 50%, inclusive.
+- No-Go: above 50%.
+**General requirements**
+
+- Use the default work hours of 7:00 AM through 5:00 PM, following the jobsite’s local time.
+- Apply No-Go before Caution when evaluating the day’s conditions.
+- If required weather data is missing, show Unavailable instead of assuming conditions are safe.
+- Display the correct rating on each daily forecast card for the selected activity.
+- Update the ratings when the user changes the selected activity or jobsite.
+- Show a clear explanation in the selected-day details explaining why the rating was assigned, including the relevant weather measurement and threshold.
+- Keep the existing map and weather API working.
+- Do not build the two extra features yet.
+- Keep everything in the single `index.html` file.
+Record my exact request in `prompts.md`. Test the calculations, including the boundary values in `spec.md`, and explain how I can check that the ratings work.
+
+## Open-Meteo Fetch Diagnosis
+
+The Open-Meteo API works when I open its URL directly in Edge, but my Jobsite Weather Planner app keeps displaying an internet connection error.
+
+Please investigate the existing `index.html` and find why the app is failing to retrieve weather data.
+
+Requirements:
+
+- Check the API URL and fetch request.
+- Check how the app handles API responses and errors.
+- Check whether the selected map coordinates are being passed correctly.
+- Fix the actual problem without removing existing features.
+- Do not change the weather rating calculations unless necessary to fix the issue.
+- Keep everything in the single `index.html` file.
+- Record my exact request in `prompts.md`.
+- Test the fix and explain what you changed.
+Do not add any new features.

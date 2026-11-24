@@ -195,9 +195,9 @@
       background: var(--red);
     }
 
-    .rating-pending {
-      background: #e7edf1;
-      color: #435665;
+    .rating-unavailable {
+      background: var(--gray);
+      color: white;
     }
 
     .card-weather {
@@ -337,7 +337,7 @@
           <option value="Concrete Pours">Concrete Pours</option>
           <option value="Roofing">Roofing</option>
         </select>
-        <p class="activity-note">Select a location on the map to load its forecast. Activity ratings will be added in Stage 4.</p>
+        <p class="activity-note">Select a location on the map to load its forecast and activity ratings.</p>
       </div>
     </section>
 
@@ -371,6 +371,10 @@
     const detailsContent = document.getElementById("detailsContent");
     const selectedCoordinates = document.getElementById("selectedCoordinates");
     const forecastStatus = document.getElementById("forecastStatus");
+    const WORK_START_HOUR = 7;
+    const WORK_END_HOUR = 17;
+    const CRANE_WIND_LIMIT = 20;
+    const CRANE_GUST_LIMIT = 25;
     let selectedDayIndex = 0;
     let forecastDays = [];
     let forecastTimezone = "";
@@ -415,6 +419,164 @@
       return formattedValue === "Unavailable" ? formattedValue : formattedValue + unit;
     }
 
+    function getRatingClass(rating) {
+      if (rating === "Go") {
+        return "rating-go";
+      }
+      if (rating === "Caution") {
+        return "rating-caution";
+      }
+      if (rating === "Unavailable") {
+        return "rating-unavailable";
+      }
+      return "rating-no-go";
+    }
+
+    function getWorkHourValues(day, property) {
+      const workHours = day.hours.filter(function (hour) {
+        const hourOfDay = Number(hour.time.slice(11, 13));
+        return hourOfDay >= WORK_START_HOUR && hourOfDay < WORK_END_HOUR;
+      });
+
+      if (workHours.length !== WORK_END_HOUR - WORK_START_HOUR) {
+        return null;
+      }
+
+      const values = workHours.map(function (hour) {
+        return hour[property];
+      });
+      if (values.some(function (value) {
+        return typeof value !== "number" || !Number.isFinite(value);
+      })) {
+        return null;
+      }
+
+      return values;
+    }
+
+    function getActivityRating(day) {
+      if (activitySelect.value === "Crane Lifts") {
+        const windSpeeds = getWorkHourValues(day, "wind");
+        const gustSpeeds = getWorkHourValues(day, "gust");
+        if (windSpeeds === null || gustSpeeds === null) {
+          return {
+            rating: "Unavailable",
+            explanation: "Hourly sustained wind and gust data must be available for every work hour from 7:00 AM through 4:00 PM local time."
+          };
+        }
+
+        const highestWind = Math.max.apply(null, windSpeeds);
+        const highestGust = Math.max.apply(null, gustSpeeds);
+        const windCautionLimit = CRANE_WIND_LIMIT * 0.8;
+        const gustCautionLimit = CRANE_GUST_LIMIT * 0.8;
+        const noGoReasons = [];
+        if (highestWind >= CRANE_WIND_LIMIT) {
+          noGoReasons.push("highest sustained wind was " + formatNumber(highestWind, 2) +
+            " mph, reaching or exceeding the " + CRANE_WIND_LIMIT + " mph limit");
+        }
+        if (highestGust >= CRANE_GUST_LIMIT) {
+          noGoReasons.push("highest gust was " + formatNumber(highestGust, 2) +
+            " mph, reaching or exceeding the " + CRANE_GUST_LIMIT + " mph limit");
+        }
+        if (noGoReasons.length > 0) {
+          return {
+            rating: "No-Go",
+            explanation: "No-Go: " + noGoReasons.join("; ") + "."
+          };
+        }
+
+        if (highestWind >= windCautionLimit || highestGust >= gustCautionLimit) {
+          return {
+            rating: "Caution",
+            explanation: "Caution: highest sustained wind was " + formatNumber(highestWind, 2) +
+              " mph (Caution at " + formatNumber(windCautionLimit, 2) + " mph; No-Go at " +
+              CRANE_WIND_LIMIT + " mph), and highest gust was " + formatNumber(highestGust, 2) +
+              " mph (Caution at " + formatNumber(gustCautionLimit, 2) +
+              " mph; No-Go at " + CRANE_GUST_LIMIT + " mph)."
+          };
+        }
+
+        return {
+          rating: "Go",
+          explanation: "Go: highest sustained wind was " + formatNumber(highestWind, 2) +
+            " mph, below the " + formatNumber(windCautionLimit, 2) +
+            " mph Caution threshold, and highest gust was " + formatNumber(highestGust, 2) +
+            " mph, below the " + formatNumber(gustCautionLimit, 2) +
+            " mph Caution threshold."
+        };
+      }
+
+      if (activitySelect.value === "Concrete Pours") {
+        const temperatures = getWorkHourValues(day, "temperature");
+        if (temperatures === null) {
+          return {
+            rating: "Unavailable",
+            explanation: "Hourly temperature data must be available for every work hour from 7:00 AM through 4:00 PM local time."
+          };
+        }
+
+        const lowestTemperature = Math.min.apply(null, temperatures);
+        if (lowestTemperature <= 32) {
+          return {
+            rating: "No-Go",
+            explanation: "No-Go: the lowest work-hour temperature was " +
+              formatNumber(lowestTemperature, 1) +
+              "°F, at or below the 32°F limit."
+          };
+        }
+        if (lowestTemperature <= 40) {
+          return {
+            rating: "Caution",
+            explanation: "Caution: the lowest work-hour temperature was " +
+              formatNumber(lowestTemperature, 1) +
+              "°F, above the 32°F No-Go limit and at or below the 40°F Caution threshold."
+          };
+        }
+
+        return {
+          rating: "Go",
+          explanation: "Go: the lowest work-hour temperature was " +
+            formatNumber(lowestTemperature, 1) +
+            "°F, above the 40°F Caution threshold."
+        };
+      }
+
+      const precipitationProbabilities =
+        getWorkHourValues(day, "precipitationProbability");
+      if (precipitationProbabilities === null) {
+        return {
+          rating: "Unavailable",
+          explanation: "Hourly precipitation probability must be available for every work hour from 7:00 AM through 4:00 PM local time."
+        };
+      }
+
+      const highestPrecipitationProbability =
+        Math.max.apply(null, precipitationProbabilities);
+      if (highestPrecipitationProbability > 50) {
+        return {
+          rating: "No-Go",
+          explanation: "No-Go: the highest work-hour precipitation probability was " +
+            formatNumber(highestPrecipitationProbability, 0) +
+            "%, above the 50% limit."
+        };
+      }
+      if (highestPrecipitationProbability >= 20) {
+        return {
+          rating: "Caution",
+          explanation: "Caution: the highest work-hour precipitation probability was " +
+            formatNumber(highestPrecipitationProbability, 0) +
+            "%, within the 20% to 50% Caution range."
+        };
+      }
+
+      return {
+        rating: "Go",
+        explanation: "Go: the highest work-hour precipitation probability was " +
+          formatNumber(highestPrecipitationProbability, 0) +
+          "%, below the 20% Caution threshold."
+      };
+    }
+
     function getValuesForDay(values, hourIndices) {
       const dailyValues = hourIndices.map(function (index) {
         return values[index];
@@ -449,13 +611,14 @@
       forecastGrid.innerHTML = "";
 
       forecastDays.forEach(function (day, index) {
+        const result = getActivityRating(day);
         const card = document.createElement("button");
         card.type = "button";
         card.className = "forecast-card";
         if (index === selectedDayIndex) {
           card.classList.add("selected");
         }
-        card.setAttribute("aria-label", formatDate(day.date) + ": forecast, not rated");
+        card.setAttribute("aria-label", formatDate(day.date) + ": " + result.rating);
 
         const dateLabel = document.createElement("span");
         dateLabel.className = "forecast-date";
@@ -470,8 +633,8 @@
         card.appendChild(temperature);
 
         const rating = document.createElement("span");
-        rating.className = "rating rating-pending";
-        rating.textContent = "Not rated yet";
+        rating.className = "rating " + getRatingClass(result.rating);
+        rating.textContent = result.rating;
         card.appendChild(rating);
 
         addCardWeather(card, "Wind: " + formatMeasurement(day.maxWind, 1, " mph"));
@@ -531,10 +694,24 @@
       heading.textContent = formatDate(day.date) + " - " + activitySelect.value;
       detailsContent.appendChild(heading);
 
-      const rating = document.createElement("p");
-      rating.className = "rating rating-pending";
-      rating.textContent = "Activity ratings will be added in Stage 4.";
-      detailsContent.appendChild(rating);
+      const result = getActivityRating(day);
+      const ratingLine = document.createElement("p");
+      const rating = document.createElement("span");
+      rating.className = "rating " + getRatingClass(result.rating);
+      rating.textContent = result.rating;
+      ratingLine.appendChild(rating);
+      detailsContent.appendChild(ratingLine);
+
+      const explanation = document.createElement("p");
+      const explanationLabel = document.createElement("strong");
+      explanationLabel.textContent = "Why this rating: ";
+      explanation.appendChild(explanationLabel);
+      explanation.appendChild(document.createTextNode(result.explanation));
+      detailsContent.appendChild(explanation);
+
+      const workHours = document.createElement("p");
+      workHours.textContent = "Rating work hours: 7:00 AM through 4:00 PM local time (5:00 PM excluded).";
+      detailsContent.appendChild(workHours);
 
       const summary = document.createElement("div");
       summary.className = "details-grid";
@@ -657,7 +834,9 @@
       url.searchParams.set("precipitation_unit", "inch");
       url.searchParams.set("timezone", "auto");
       url.searchParams.set("forecast_days", "7");
+      let requestTimedOut = false;
       const requestTimeout = setTimeout(function () {
+        requestTimedOut = true;
         requestController.abort();
       }, 15000);
 
@@ -701,8 +880,20 @@
 
         forecastDays = [];
         forecastStatus.className = "forecast-status error";
-        forecastStatus.textContent =
-          "Weather data could not be retrieved. Please check your internet connection and try again.";
+        if (window.location.protocol === "file:" &&
+            (requestTimedOut || (error && error.name === "TypeError"))) {
+          forecastStatus.textContent =
+            "This page is open from a file:// address. Edge may block JavaScript requests from local files even when an API URL opens directly. Open index.html through a local web server, such as VS Code Live Server, then select the location again.";
+        } else if (requestTimedOut) {
+          forecastStatus.textContent =
+            "Weather data could not be retrieved because the Open-Meteo request timed out. Please try again.";
+        } else if (error && error.message) {
+          forecastStatus.textContent =
+            "Weather data could not be retrieved: " + error.message;
+        } else {
+          forecastStatus.textContent =
+            "Weather data could not be retrieved. Please check your internet connection and try again.";
+        }
         renderForecast();
         renderDetails();
       } finally {
@@ -711,6 +902,7 @@
     }
 
     activitySelect.addEventListener("change", function () {
+      renderForecast();
       renderDetails();
     });
 
