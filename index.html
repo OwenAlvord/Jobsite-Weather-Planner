@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jobsite Weather Planner</title>
+  <style>
+    :root {
+      --navy: #18324a;
+      --blue: #2878a6;
+      --green: #267a46;
+      --yellow: #a66f00;
+      --red: #b33a3a;
+      --gray: #66717d;
+      --light: #f3f6f8;
+      --border: #d9e1e6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1f2d38;
+      background: var(--light);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--navy);
+      color: white;
+      padding: 24px 20px;
+    }
+
+    header h1,
+    header p {
+      max-width: 1100px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    header h1 {
+      margin-top: 0;
+      margin-bottom: 6px;
+      font-size: 2rem;
+    }
+
+    header p {
+      margin-top: 0;
+      margin-bottom: 0;
+      color: #dce8f0;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 20px 32px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 2px 8px rgba(24, 50, 74, 0.06);
+    }
+
+    .map-placeholder {
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #526879;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.78)),
+        repeating-linear-gradient(45deg, #d8e6d8 0, #d8e6d8 20px, #e7efde 20px, #e7efde 40px);
+      border: 2px dashed #91a6b5;
+      border-radius: 6px;
+    }
+
+    .map-placeholder strong {
+      color: var(--navy);
+      font-size: 1.1rem;
+    }
+
+    .location-display {
+      margin: 12px 0 0;
+      font-size: 0.95rem;
+      color: var(--gray);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: var(--navy);
+    }
+
+    select {
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 1px solid #abb8c2;
+      border-radius: 5px;
+      background: white;
+      color: #1f2d38;
+      font-size: 1rem;
+    }
+
+    .activity-note {
+      margin: 14px 0 0;
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: var(--navy);
+    }
+
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .forecast-card {
+      min-height: 180px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: white;
+      color: #1f2d38;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 2px 7px rgba(24, 50, 74, 0.05);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .forecast-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 12px rgba(24, 50, 74, 0.12);
+    }
+
+    .forecast-card:focus {
+      outline: 3px solid #82b7d3;
+      outline-offset: 2px;
+    }
+
+    .forecast-card.selected {
+      border: 2px solid var(--blue);
+    }
+
+    .forecast-date {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: var(--navy);
+    }
+
+    .temperature {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    .rating {
+      display: inline-block;
+      margin: 4px 0 8px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .rating-go {
+      background: var(--green);
+    }
+
+    .rating-caution {
+      background: var(--yellow);
+      color: #231a00;
+    }
+
+    .rating-no-go {
+      background: var(--red);
+    }
+
+    .card-weather {
+      display: block;
+      margin-top: 4px;
+      color: var(--gray);
+      font-size: 0.85rem;
+    }
+
+    .details {
+      margin-top: 20px;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .detail-item {
+      padding: 12px;
+      background: var(--light);
+      border-radius: 6px;
+    }
+
+    .detail-item strong {
+      display: block;
+      color: var(--navy);
+      margin-bottom: 3px;
+    }
+
+    .disclaimer {
+      margin: 16px 0 0;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      color: var(--gray);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 900px) {
+      .forecast-grid {
+        grid-template-columns: repeat(4, minmax(140px, 1fr));
+      }
+    }
+
+    @media (max-width: 700px) {
+      .controls,
+      .details-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .forecast-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .map-placeholder {
+        min-height: 220px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      header h1 {
+        font-size: 1.6rem;
+      }
+
+      main {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .forecast-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .forecast-card {
+        min-height: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Jobsite Weather Planner</h1>
+    <p>Review 7-day weather conditions and simple work ratings for outdoor construction planning.</p>
+  </header>
+
+  <main>
+    <section class="controls" aria-label="Jobsite and activity controls">
+      <div class="panel">
+        <div class="map-placeholder" aria-label="Map placeholder">
+          <strong>Interactive Jobsite Map</strong>
+          <span>Map selection will be available in Stage 2.</span>
+        </div>
+        <p class="location-display">Selected jobsite: No location selected</p>
+      </div>
+
+      <div class="panel">
+        <label for="activity">Construction activity</label>
+        <select id="activity">
+          <option value="Crane Lifts">Crane Lifts</option>
+          <option value="Concrete Pours">Concrete Pours</option>
+          <option value="Roofing">Roofing</option>
+        </select>
+        <p class="activity-note">Sample ratings are shown for layout and mockup testing.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="forecast-heading">
+      <h2 id="forecast-heading">7-Day Forecast</h2>
+      <div id="forecastGrid" class="forecast-grid"></div>
+    </section>
+
+    <section class="panel details" aria-labelledby="details-heading">
+      <h2 id="details-heading">Selected Day Details</h2>
+      <div id="detailsContent"></div>
+    </section>
+
+    <p class="disclaimer">
+      Planning tool only. Ratings do not replace professional judgment, manufacturer instructions,
+      jobsite safety procedures, or project specifications.
+    </p>
+  </main>
+
+  <script>
+    const forecast = [
+      {
+        date: "Today",
+        fullDate: "November 24",
+        high: 58,
+        low: 41,
+        sustainedWind: 12,
+        gust: 18,
+        precipitation: 10,
+        rating: "Go",
+        explanation: "Sustained wind and gusts are below the crane limits."
+      },
+      {
+        date: "Tuesday",
+        fullDate: "November 25",
+        high: 55,
+        low: 38,
+        sustainedWind: 16,
+        gust: 20,
+        precipitation: 35,
+        rating: "Caution",
+        explanation: "One or more measurements reach 80% of a planning threshold."
+      },
+      {
+        date: "Wednesday",
+        fullDate: "November 26",
+        high: 47,
+        low: 31,
+        sustainedWind: 21,
+        gust: 27,
+        precipitation: 60,
+        rating: "No-Go",
+        explanation: "At least one work-hour measurement reaches or exceeds a No-Go threshold."
+      },
+      {
+        date: "Thursday",
+        fullDate: "November 27",
+        high: 52,
+        low: 40,
+        sustainedWind: 14,
+        gust: 19,
+        precipitation: 25,
+        rating: "Caution",
+        explanation: "A work-hour temperature or weather condition is within the Caution range."
+      },
+      {
+        date: "Friday",
+        fullDate: "November 28",
+        high: 61,
+        low: 44,
+        sustainedWind: 11,
+        gust: 15,
+        precipitation: 12,
+        rating: "Go",
+        explanation: "The sample work-hour measurements are within Go ranges."
+      },
+      {
+        date: "Saturday",
+        fullDate: "November 29",
+        high: 49,
+        low: 33,
+        sustainedWind: 18,
+        gust: 24,
+        precipitation: 45,
+        rating: "Caution",
+        explanation: "One or more measurements are in the Caution range."
+      },
+      {
+        date: "Sunday",
+        fullDate: "November 30",
+        high: 56,
+        low: 39,
+        sustainedWind: 22,
+        gust: 29,
+        precipitation: 55,
+        rating: "No-Go",
+        explanation: "One or more work-hour measurements exceed a planning limit."
+      }
+    ];
+
+    const activitySelect = document.getElementById("activity");
+    const forecastGrid = document.getElementById("forecastGrid");
+    const detailsContent = document.getElementById("detailsContent");
+    let selectedDayIndex = 0;
+
+    function getRatingClass(rating) {
+      if (rating === "Go") {
+        return "rating-go";
+      }
+      if (rating === "Caution") {
+        return "rating-caution";
+      }
+      return "rating-no-go";
+    }
+
+    function getActivityExplanation(day) {
+      const activity = activitySelect.value;
+
+      if (activity === "Crane Lifts") {
+        if (day.rating === "Go") {
+          return "Sustained wind and gusts are below the selected crane limits.";
+        }
+        if (day.rating === "Caution") {
+          return "A sustained wind or gust value reaches at least 80% of a selected limit.";
+        }
+        return "A sustained wind or gust value reaches or exceeds a selected limit.";
+      }
+
+      if (activity === "Concrete Pours") {
+        if (day.rating === "Go") {
+          return "All sample work-hour temperatures are above 40°F.";
+        }
+        if (day.rating === "Caution") {
+          return "At least one sample work-hour temperature is from 33°F to 40°F.";
+        }
+        return "At least one sample work-hour temperature is 32°F or lower.";
+      }
+
+      if (day.rating === "Go") {
+        return "The maximum sample precipitation probability is below 20%.";
+      }
+      if (day.rating === "Caution") {
+        return "The maximum sample precipitation probability is from 20% to 50%.";
+      }
+      return "The maximum sample precipitation probability is above 50%.";
+    }
+
+    function renderForecast() {
+      forecastGrid.innerHTML = "";
+
+      forecast.forEach(function (day, index) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "forecast-card";
+        if (index === selectedDayIndex) {
+          card.classList.add("selected");
+        }
+        card.setAttribute("aria-label", day.fullDate + ": " + day.rating);
+
+        card.innerHTML =
+          '<span class="forecast-date">' + day.date + '<br>' + day.fullDate + '</span>' +
+          '<span class="temperature">' + day.high + '° / ' + day.low + '°F</span>' +
+          '<span class="rating ' + getRatingClass(day.rating) + '">' + day.rating + '</span>' +
+          '<span class="card-weather">' + day.sustainedWind + ' mph wind</span>' +
+          '<span class="card-weather">' + day.precipitation + '% precipitation</span>';
+
+        card.addEventListener("click", function () {
+          selectedDayIndex = index;
+          renderForecast();
+          renderDetails();
+        });
+
+        forecastGrid.appendChild(card);
+      });
+    }
+
+    function renderDetails() {
+      const day = forecast[selectedDayIndex];
+      const explanation = getActivityExplanation(day);
+
+      detailsContent.innerHTML =
+        '<h3>' + day.fullDate + ' - ' + activitySelect.value + '</h3>' +
+        '<p><span class="rating ' + getRatingClass(day.rating) + '">' + day.rating + '</span></p>' +
+        '<div class="details-grid">' +
+          '<div class="detail-item"><strong>Temperature</strong>' + day.high + '°F high / ' + day.low + '°F low</div>' +
+          '<div class="detail-item"><strong>Wind</strong>' + day.sustainedWind + ' mph sustained / ' + day.gust + ' mph gust</div>' +
+          '<div class="detail-item"><strong>Precipitation</strong>' + day.precipitation + '% chance</div>' +
+        '</div>' +
+        '<p><strong>Why this rating:</strong> ' + explanation + '</p>' +
+        '<p><strong>Sample work hours:</strong> 7:00 AM to 5:00 PM</p>';
+    }
+
+    activitySelect.addEventListener("change", function () {
+      renderForecast();
+      renderDetails();
+    });
+
+    renderForecast();
+    renderDetails();
+  </script>
+</body>
+</html>
