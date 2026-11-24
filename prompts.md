@@ -135,3 +135,27 @@ Requirements:
 - Record my exact request in `prompts.md`.
 - Test the fix and explain what you changed.
 Do not add any new features.
+
+## Stage 5 Review and Validation
+
+Read `AGENTS.md` and `spec.md`.
+
+Perform Stage 5: Review and validate the complete Jobsite Weather Planner against the requirements in `spec.md`.
+
+Check the following:
+
+1. Interactive map selects a location and updates latitude and longitude.
+2. Open-Meteo retrieves the correct seven-day forecast for the selected location.
+3. Crane Lift calculations follow all specified limits and boundary conditions.
+4. Concrete Pour calculations follow all specified temperature thresholds.
+5. Roofing calculations follow all specified precipitation thresholds.
+6. No-Go takes priority over Caution, and Caution takes priority over Go.
+7. Missing weather data produces Unavailable rather than an incorrect safe rating.
+8. API errors display a clear message.
+9. Changing activities updates all ratings.
+10. Selected-day details explain the rating correctly.
+Use the hand-worked examples and boundary tests in `spec.md` to verify the calculations.
+
+Fix any problems you find. Do not add new features or change the approved requirements.
+
+Record my exact request in `prompts.md`. Explain what passed, what failed, and what you fixed. Do not commit changes yourself.
