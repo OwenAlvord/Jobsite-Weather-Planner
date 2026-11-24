@@ -30,3 +30,25 @@ This file records the prompts used to plan, build, test, and improve the Jobsite
   - Test the page and fix any errors.
   - Do not change spec.md or AGENTS.md.
 - When finished, explain what you built and how I can test it.
+
+## Stage 2 Jobsite Map
+
+Read AGENTS.md and spec.md before making changes.
+
+Build Stage 2 of my Jobsite Weather Planner.
+
+Add an interactive map using Leaflet and OpenStreetMap.
+
+Requirements:
+
+1. Display the map in the existing map section.
+2. Allow users to click anywhere on the map to select a jobsite.
+3. Place a marker at the selected location.
+4. Allow users to click another location to move the marker.
+5. Display the selected latitude and longitude.
+6. Update the selected jobsite information whenever the marker moves.
+7. Keep all existing Stage 1 features working.
+8. Do not connect the weather API yet.
+9. Keep all HTML, CSS, and JavaScript in index.html.
+10. Record this exact request in prompts.md.
+Test the map and fix any problems. Do not build the additional features yet. When finished, explain how I can test the map.

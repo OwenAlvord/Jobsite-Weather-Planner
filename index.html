@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jobsite Weather Planner</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
   <style>
     :root {
       --navy: #18324a;
@@ -74,30 +80,20 @@
       box-shadow: 0 2px 8px rgba(24, 50, 74, 0.06);
     }
 
-    .map-placeholder {
-      min-height: 280px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      color: #526879;
-      background:
-        linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.78)),
-        repeating-linear-gradient(45deg, #d8e6d8 0, #d8e6d8 20px, #e7efde 20px, #e7efde 40px);
-      border: 2px dashed #91a6b5;
+    .jobsite-map {
+      height: 280px;
+      border: 1px solid var(--border);
       border-radius: 6px;
-    }
-
-    .map-placeholder strong {
-      color: var(--navy);
-      font-size: 1.1rem;
     }
 
     .location-display {
       margin: 12px 0 0;
       font-size: 0.95rem;
       color: var(--gray);
+    }
+
+    .location-display strong {
+      color: var(--navy);
     }
 
     label {
@@ -253,8 +249,8 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .map-placeholder {
-        min-height: 220px;
+      .jobsite-map {
+        height: 220px;
       }
     }
 
@@ -287,11 +283,11 @@
   <main>
     <section class="controls" aria-label="Jobsite and activity controls">
       <div class="panel">
-        <div class="map-placeholder" aria-label="Map placeholder">
-          <strong>Interactive Jobsite Map</strong>
-          <span>Map selection will be available in Stage 2.</span>
-        </div>
-        <p class="location-display">Selected jobsite: No location selected</p>
+        <div id="map" class="jobsite-map" aria-label="Interactive map for selecting a jobsite"></div>
+        <p class="location-display">
+          <strong>Selected jobsite:</strong>
+          <span id="selectedCoordinates" aria-live="polite">No location selected. Click the map to choose a jobsite.</span>
+        </p>
       </div>
 
       <div class="panel">
@@ -321,6 +317,11 @@
     </p>
   </main>
 
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
   <script>
     const forecast = [
       {
@@ -405,7 +406,33 @@
     const activitySelect = document.getElementById("activity");
     const forecastGrid = document.getElementById("forecastGrid");
     const detailsContent = document.getElementById("detailsContent");
+    const selectedCoordinates = document.getElementById("selectedCoordinates");
     let selectedDayIndex = 0;
+
+    const map = L.map("map").setView([39.5, -98.35], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    let selectedMarker = null;
+
+    function updateSelectedLocation() {
+      const location = selectedMarker.getLatLng();
+      selectedCoordinates.textContent =
+        "Latitude: " + location.lat.toFixed(6) + ", Longitude: " + location.lng.toFixed(6);
+    }
+
+    map.on("click", function (event) {
+      if (selectedMarker === null) {
+        selectedMarker = L.marker(event.latlng).addTo(map);
+        selectedMarker.on("move", updateSelectedLocation);
+        updateSelectedLocation();
+        return;
+      }
+
+      selectedMarker.setLatLng(event.latlng);
+    });
 
     function getRatingClass(rating) {
       if (rating === "Go") {
