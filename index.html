@@ -264,6 +264,99 @@
       margin-top: 20px;
     }
 
+    .print-brief-button {
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 5px;
+      background: var(--blue);
+      color: white;
+      font: inherit;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .print-brief-button:focus {
+      outline: 3px solid #82b7d3;
+      outline-offset: 2px;
+    }
+
+    .print-brief-button:disabled {
+      background: var(--gray);
+      cursor: not-allowed;
+    }
+
+    .print-brief {
+      display: none;
+    }
+
+    .brief-title {
+      margin: 0 0 4px;
+      color: #000;
+      font-size: 1.8rem;
+    }
+
+    .brief-date {
+      margin: 0 0 18px;
+      color: #333;
+    }
+
+    .brief-info {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .brief-field {
+      padding: 10px;
+      border: 1px solid #c8c8c8;
+      border-radius: 4px;
+    }
+
+    .brief-field strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .brief-rating {
+      display: inline-block;
+      padding: 5px 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .brief-section {
+      margin-top: 18px;
+      break-inside: avoid;
+    }
+
+    .brief-section h2 {
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #888;
+      color: #000;
+      font-size: 1.15rem;
+    }
+
+    .brief-section p,
+    .brief-section ul {
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .brief-measurements {
+      padding-left: 22px;
+    }
+
+    .brief-disclaimer {
+      margin-top: 22px;
+      padding-top: 8px;
+      border-top: 1px solid #888;
+      font-size: 0.85rem;
+    }
+
     .details-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -354,6 +447,44 @@
         min-height: 150px;
       }
     }
+
+    @page {
+      margin: 0.65in;
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: black;
+        font-size: 10.5pt;
+      }
+
+      body > :not(#printBrief) {
+        display: none !important;
+      }
+
+      #printBrief {
+        display: block !important;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        color: black;
+      }
+
+      .brief-info {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .brief-field,
+      .brief-section {
+        break-inside: avoid;
+      }
+
+      .brief-rating {
+        background: white !important;
+        color: black !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -407,6 +538,10 @@
 
     <section class="panel details" aria-labelledby="details-heading">
       <h2 id="details-heading">Selected Day Details</h2>
+      <button id="printBriefButton" class="print-brief-button" type="button" disabled
+        title="Select a jobsite and wait for its forecast before printing.">
+        Print Daily Field Brief
+      </button>
       <div id="detailsContent"></div>
     </section>
 
@@ -415,6 +550,8 @@
       jobsite safety procedures, or project specifications.
     </p>
   </main>
+
+  <article id="printBrief" class="print-brief" aria-labelledby="briefTitle"></article>
 
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -425,6 +562,8 @@
     const activitySelect = document.getElementById("activity");
     const forecastGrid = document.getElementById("forecastGrid");
     const detailsContent = document.getElementById("detailsContent");
+    const printBriefButton = document.getElementById("printBriefButton");
+    const printBrief = document.getElementById("printBrief");
     const selectedCoordinates = document.getElementById("selectedCoordinates");
     const forecastStatus = document.getElementById("forecastStatus");
     const workStartInput = document.getElementById("workStart");
@@ -531,7 +670,7 @@
       return "rating-no-go";
     }
 
-    function getWorkHourValues(day, property) {
+    function getWorkHourRecords(day) {
       const expectedHourStarts = [];
       for (let hour = 0; hour < 24; hour += 1) {
         const hourStartMinutes = hour * 60;
@@ -557,6 +696,15 @@
       }));
       if (workHours.length !== expectedHourStarts.length ||
           foundHourStarts.size !== expectedHourStarts.length) {
+        return null;
+      }
+
+      return workHours;
+    }
+
+    function getWorkHourValues(day, property) {
+      const workHours = getWorkHourRecords(day);
+      if (workHours === null) {
         return null;
       }
 
@@ -730,6 +878,7 @@
 
     function renderForecast() {
       forecastGrid.innerHTML = "";
+      printBriefButton.disabled = selectedMarker === null || forecastDays.length !== 7;
 
       forecastDays.forEach(function (day, index) {
         const result = getActivityRating(day);
@@ -895,6 +1044,206 @@
       detailsContent.appendChild(tableWrap);
     }
 
+    function formatBriefDate(dateString) {
+      const date = new Date(dateString + "T12:00:00");
+      return new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+      }).format(date);
+    }
+
+    function addBriefField(container, label, value) {
+      const field = document.createElement("div");
+      field.className = "brief-field";
+
+      const heading = document.createElement("strong");
+      heading.textContent = label;
+      field.appendChild(heading);
+      field.appendChild(document.createTextNode(value));
+      container.appendChild(field);
+    }
+
+    function createBriefSection(title) {
+      const section = document.createElement("section");
+      section.className = "brief-section";
+
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      section.appendChild(heading);
+      return section;
+    }
+
+    function getPlanningConsiderations(activity, rating) {
+      if (rating === "Unavailable") {
+        return [
+          "Required forecast readings are missing for at least one selected work period; do not treat this as a safe condition.",
+          "Verify conditions with a reliable weather source and follow the jobsite's approved safety procedures."
+        ];
+      }
+
+      if (activity === "Crane Lifts") {
+        if (rating === "No-Go") {
+          return [
+            "Do not proceed while forecast winds or gusts meet or exceed the planned limits; follow the approved stop-work procedure.",
+            "Recheck conditions and the lift plan before rescheduling."
+          ];
+        }
+        if (rating === "Caution") {
+          return [
+            "Review forecast wind and gusts against the crane manufacturer's limits and approved lift plan.",
+            "Monitor wind conditions at the jobsite and pause if limits are approached."
+          ];
+        }
+        return [
+          "Confirm actual wind and gust conditions at the jobsite before and during the lift.",
+          "Continue to follow the approved lift plan and crane manufacturer's limits."
+        ];
+      }
+
+      if (activity === "Concrete Pours") {
+        if (rating === "No-Go") {
+          return [
+            "Consider postponing placement and review the cold-weather protection plan before rescheduling.",
+            "Follow the approved project requirements for concrete temperature, protection, and curing."
+          ];
+        }
+        if (rating === "Caution") {
+          return [
+            "Review the cold-weather concrete plan, mix requirements, and protection and curing arrangements with project personnel.",
+            "Monitor jobsite temperatures and follow the approved placement procedures."
+          ];
+        }
+        return [
+          "Confirm the approved placement, temperature, protection, and curing requirements are met.",
+          "Continue to monitor actual jobsite conditions during the pour."
+        ];
+      }
+
+      if (rating === "No-Go") {
+        return [
+          "Consider rescheduling until forecast and actual conditions meet the roofing material requirements.",
+          "Follow jobsite procedures for wet or slippery roof surfaces."
+        ];
+      }
+      if (rating === "Caution") {
+        return [
+          "Coordinate a dry-work window and monitor precipitation chances and roof-surface conditions.",
+          "Secure materials and follow the roofing manufacturer's instructions if conditions change."
+        ];
+      }
+      return [
+        "Confirm the roof and materials remain dry before work begins.",
+        "Continue to follow roofing manufacturer instructions and jobsite safety procedures."
+      ];
+    }
+
+    function buildPrintableBrief() {
+      const day = forecastDays[selectedDayIndex];
+      if (!day || selectedMarker === null) {
+        return false;
+      }
+
+      const location = selectedMarker.getLatLng();
+      const result = getActivityRating(day);
+      printBrief.innerHTML = "";
+
+      const title = document.createElement("h1");
+      title.id = "briefTitle";
+      title.className = "brief-title";
+      title.textContent = "Jobsite Weather Planner - Daily Field Brief";
+      printBrief.appendChild(title);
+
+      const date = document.createElement("p");
+      date.className = "brief-date";
+      date.textContent = formatBriefDate(day.date);
+      printBrief.appendChild(date);
+
+      const summary = document.createElement("div");
+      summary.className = "brief-info";
+      addBriefField(summary, "Jobsite coordinates",
+        location.lat.toFixed(6) + ", " + location.lng.toFixed(6));
+      addBriefField(summary, "Construction activity", activitySelect.value);
+      addBriefField(summary, "Crew work hours",
+        getWorkHoursDescription() + ", local jobsite time");
+      addBriefField(summary, "Jobsite timezone", forecastTimezone);
+      addBriefField(summary, "Daily high / low",
+        formatMeasurement(day.high, 1, "°F") + " / " +
+        formatMeasurement(day.low, 1, "°F"));
+      printBrief.appendChild(summary);
+
+      const ratingSection = createBriefSection("Daily rating");
+      const rating = document.createElement("span");
+      rating.className = "brief-rating " + getRatingClass(result.rating);
+      rating.textContent = result.rating;
+      ratingSection.appendChild(rating);
+      printBrief.appendChild(ratingSection);
+
+      const weatherSection = createBriefSection("Activity weather measurements");
+      const measurements = document.createElement("ul");
+      measurements.className = "brief-measurements";
+      const addMeasurement = function (label, value) {
+        const item = document.createElement("li");
+        item.textContent = label + ": " + value;
+        measurements.appendChild(item);
+      };
+      const workHours = getWorkHourRecords(day);
+
+      if (activitySelect.value === "Crane Lifts") {
+        const windSpeeds = getWorkHourValues(day, "wind");
+        const gustSpeeds = getWorkHourValues(day, "gust");
+        addMeasurement("Highest sustained wind",
+          windSpeeds === null ? "Unavailable" :
+            formatMeasurement(Math.max.apply(null, windSpeeds), 2, " mph"));
+        addMeasurement("Highest wind gust",
+          gustSpeeds === null ? "Unavailable" :
+            formatMeasurement(Math.max.apply(null, gustSpeeds), 2, " mph"));
+      } else if (activitySelect.value === "Concrete Pours") {
+        if (workHours === null) {
+          addMeasurement("Work-hour temperatures", "Unavailable; hourly forecast periods are missing.");
+        } else {
+          workHours.forEach(function (hour) {
+            const hourMinutes = Number(hour.time.slice(11, 13)) * 60 +
+              Number(hour.time.slice(14, 16));
+            addMeasurement(formatWorkTime(hourMinutes),
+              formatMeasurement(hour.temperature, 1, "°F"));
+          });
+        }
+      } else {
+        const precipitationProbabilities =
+          getWorkHourValues(day, "precipitationProbability");
+        addMeasurement("Highest precipitation probability",
+          precipitationProbabilities === null ? "Unavailable" :
+            formatMeasurement(Math.max.apply(null, precipitationProbabilities), 0, "%"));
+      }
+      weatherSection.appendChild(measurements);
+      printBrief.appendChild(weatherSection);
+
+      const explanationSection = createBriefSection("Why this rating");
+      const explanation = document.createElement("p");
+      explanation.textContent = result.explanation;
+      explanationSection.appendChild(explanation);
+      printBrief.appendChild(explanationSection);
+
+      const planningSection = createBriefSection("Planning considerations");
+      const planningList = document.createElement("ul");
+      getPlanningConsiderations(activitySelect.value, result.rating).forEach(function (itemText) {
+        const item = document.createElement("li");
+        item.textContent = itemText;
+        planningList.appendChild(item);
+      });
+      planningSection.appendChild(planningList);
+      printBrief.appendChild(planningSection);
+
+      const disclaimer = document.createElement("p");
+      disclaimer.className = "brief-disclaimer";
+      disclaimer.textContent =
+        "Planning aid only. This brief does not replace professional judgment, manufacturer instructions, jobsite safety procedures, lift plans, or project specifications.";
+      printBrief.appendChild(disclaimer);
+      return true;
+    }
+
     function createForecastDays(data) {
       const hourly = data.hourly;
       return data.daily.time.map(function (date, dayIndex) {
@@ -1026,6 +1375,12 @@
     activitySelect.addEventListener("change", function () {
       renderForecast();
       renderDetails();
+    });
+
+    printBriefButton.addEventListener("click", function () {
+      if (buildPrintableBrief()) {
+        window.print();
+      }
     });
 
     workStartInput.addEventListener("change", updateWorkHours);

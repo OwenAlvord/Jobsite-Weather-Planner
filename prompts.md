@@ -183,3 +183,34 @@ Requirements:
 Record my exact request in `prompts.md`. Test the feature, including changing the hours and checking that all three activity ratings update correctly. Explain how I can test it myself.
 
 Do not commit anything yet.
+
+## Extra Feature 2: Printable Daily Field Brief
+
+Read `AGENTS.md` and `spec.md` before making changes.
+
+Build Extra Feature 2: Printable Daily Field Brief.
+
+Requirements:
+
+- Add a clear “Print Daily Field Brief” button.
+- The report must use the currently selected forecast day.
+- Include the jobsite latitude and longitude.
+- Include the selected date and activity.
+- Include the Go, Caution, No-Go, or Unavailable rating.
+- Include the day’s high and low temperatures.
+- Include relevant weather measurements for the selected activity:
+
+- Crane Lifts: highest sustained wind and highest wind gust during work hours.
+- Concrete Pours: temperatures during work hours.
+- Roofing: highest precipitation probability during work hours.
+- Include the explanation for the activity rating.
+- Include the selected crew work hours.
+- Add practical planning considerations based on the rating and weather conditions.
+- Format the report cleanly for printing on paper.
+- Use print-specific CSS so the report prints without the map, controls, or unnecessary page elements.
+- Make sure the report reflects changes when the user selects another day, activity, location, or work schedule.
+- Keep all existing features working.
+- Keep the app in the single `index.html` file.
+Record my exact request in `prompts.md`. Test the print feature and explain how I can check the report before printing.
+
+Do not commit anything yet.
