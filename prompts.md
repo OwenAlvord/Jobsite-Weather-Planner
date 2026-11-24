@@ -52,3 +52,27 @@ Requirements:
 9. Keep all HTML, CSS, and JavaScript in index.html.
 10. Record this exact request in prompts.md.
 Test the map and fix any problems. Do not build the additional features yet. When finished, explain how I can test the map.
+
+## Stage 3 Weather API
+
+Read `AGENTS.md` and `spec.md` before making changes.
+
+Build Stage 3: Connect the Jobsite Weather Planner to the Open-Meteo weather API.
+
+Requirements:
+
+- Use the latitude and longitude from the location selected on the Leaflet map.
+- Retrieve a 7-day forecast using the Open-Meteo API. No API key is needed.
+- Request hourly temperature, wind speed, wind gusts, precipitation probability, and precipitation amount.
+- Request daily high and low temperatures.
+- Use Fahrenheit, mph, and inches.
+- Use the jobsite’s local timezone with `timezone=auto`.
+- Display the actual forecast information in the existing seven daily forecast cards.
+- Update the forecast when the user selects a different map location.
+- Show a loading message while weather data is being retrieved.
+- Show a clear error message if the API request fails.
+- Keep the existing map, activity dropdown, daily cards, and selected-day details working.
+- Do not implement the activity rating calculations yet. Those will be Stage 4.
+- Do not add either extra feature yet.
+- Keep the app in the single `index.html` file.
+Record my exact request in `prompts.md`. Test the changes and explain how I can check that the weather data is updating correctly.

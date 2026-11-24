@@ -195,11 +195,27 @@
       background: var(--red);
     }
 
+    .rating-pending {
+      background: #e7edf1;
+      color: #435665;
+    }
+
     .card-weather {
       display: block;
       margin-top: 4px;
       color: var(--gray);
       font-size: 0.85rem;
+    }
+
+    .forecast-status {
+      min-height: 1.5em;
+      margin: 0 0 14px;
+      color: var(--gray);
+    }
+
+    .forecast-status.error {
+      color: var(--red);
+      font-weight: bold;
     }
 
     .details {
@@ -223,6 +239,30 @@
       display: block;
       color: var(--navy);
       margin-bottom: 3px;
+    }
+
+    .hourly-table-wrap {
+      overflow-x: auto;
+    }
+
+    .hourly-table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .hourly-table th,
+    .hourly-table td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .hourly-table th {
+      color: var(--navy);
+      background: var(--light);
     }
 
     .disclaimer {
@@ -277,7 +317,7 @@
 <body>
   <header>
     <h1>Jobsite Weather Planner</h1>
-    <p>Review 7-day weather conditions and simple work ratings for outdoor construction planning.</p>
+    <p>Review a 7-day weather forecast for your outdoor construction site.</p>
   </header>
 
   <main>
@@ -297,12 +337,15 @@
           <option value="Concrete Pours">Concrete Pours</option>
           <option value="Roofing">Roofing</option>
         </select>
-        <p class="activity-note">Sample ratings are shown for layout and mockup testing.</p>
+        <p class="activity-note">Select a location on the map to load its forecast. Activity ratings will be added in Stage 4.</p>
       </div>
     </section>
 
     <section aria-labelledby="forecast-heading">
       <h2 id="forecast-heading">7-Day Forecast</h2>
+      <p id="forecastStatus" class="forecast-status" role="status" aria-live="polite">
+        Click the map to select a jobsite and load its forecast.
+      </p>
       <div id="forecastGrid" class="forecast-grid"></div>
     </section>
 
@@ -323,91 +366,15 @@
     crossorigin=""
   ></script>
   <script>
-    const forecast = [
-      {
-        date: "Today",
-        fullDate: "November 24",
-        high: 58,
-        low: 41,
-        sustainedWind: 12,
-        gust: 18,
-        precipitation: 10,
-        rating: "Go",
-        explanation: "Sustained wind and gusts are below the crane limits."
-      },
-      {
-        date: "Tuesday",
-        fullDate: "November 25",
-        high: 55,
-        low: 38,
-        sustainedWind: 16,
-        gust: 20,
-        precipitation: 35,
-        rating: "Caution",
-        explanation: "One or more measurements reach 80% of a planning threshold."
-      },
-      {
-        date: "Wednesday",
-        fullDate: "November 26",
-        high: 47,
-        low: 31,
-        sustainedWind: 21,
-        gust: 27,
-        precipitation: 60,
-        rating: "No-Go",
-        explanation: "At least one work-hour measurement reaches or exceeds a No-Go threshold."
-      },
-      {
-        date: "Thursday",
-        fullDate: "November 27",
-        high: 52,
-        low: 40,
-        sustainedWind: 14,
-        gust: 19,
-        precipitation: 25,
-        rating: "Caution",
-        explanation: "A work-hour temperature or weather condition is within the Caution range."
-      },
-      {
-        date: "Friday",
-        fullDate: "November 28",
-        high: 61,
-        low: 44,
-        sustainedWind: 11,
-        gust: 15,
-        precipitation: 12,
-        rating: "Go",
-        explanation: "The sample work-hour measurements are within Go ranges."
-      },
-      {
-        date: "Saturday",
-        fullDate: "November 29",
-        high: 49,
-        low: 33,
-        sustainedWind: 18,
-        gust: 24,
-        precipitation: 45,
-        rating: "Caution",
-        explanation: "One or more measurements are in the Caution range."
-      },
-      {
-        date: "Sunday",
-        fullDate: "November 30",
-        high: 56,
-        low: 39,
-        sustainedWind: 22,
-        gust: 29,
-        precipitation: 55,
-        rating: "No-Go",
-        explanation: "One or more work-hour measurements exceed a planning limit."
-      }
-    ];
-
     const activitySelect = document.getElementById("activity");
     const forecastGrid = document.getElementById("forecastGrid");
     const detailsContent = document.getElementById("detailsContent");
     const selectedCoordinates = document.getElementById("selectedCoordinates");
+    const forecastStatus = document.getElementById("forecastStatus");
     let selectedDayIndex = 0;
+    let forecastDays = [];
+    let forecastTimezone = "";
+    let activeForecastRequest = null;
 
     const map = L.map("map").setView([39.5, -98.35], 4);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -427,73 +394,92 @@
       if (selectedMarker === null) {
         selectedMarker = L.marker(event.latlng).addTo(map);
         selectedMarker.on("move", updateSelectedLocation);
-        updateSelectedLocation();
-        return;
+      } else {
+        selectedMarker.setLatLng(event.latlng);
       }
 
-      selectedMarker.setLatLng(event.latlng);
+      updateSelectedLocation();
+      loadForecast(event.latlng);
     });
 
-    function getRatingClass(rating) {
-      if (rating === "Go") {
-        return "rating-go";
+    function formatNumber(value, decimals) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return "Unavailable";
       }
-      if (rating === "Caution") {
-        return "rating-caution";
-      }
-      return "rating-no-go";
+
+      return value.toFixed(decimals);
     }
 
-    function getActivityExplanation(day) {
-      const activity = activitySelect.value;
+    function formatMeasurement(value, decimals, unit) {
+      const formattedValue = formatNumber(value, decimals);
+      return formattedValue === "Unavailable" ? formattedValue : formattedValue + unit;
+    }
 
-      if (activity === "Crane Lifts") {
-        if (day.rating === "Go") {
-          return "Sustained wind and gusts are below the selected crane limits.";
-        }
-        if (day.rating === "Caution") {
-          return "A sustained wind or gust value reaches at least 80% of a selected limit.";
-        }
-        return "A sustained wind or gust value reaches or exceeds a selected limit.";
-      }
+    function getValuesForDay(values, hourIndices) {
+      const dailyValues = hourIndices.map(function (index) {
+        return values[index];
+      });
 
-      if (activity === "Concrete Pours") {
-        if (day.rating === "Go") {
-          return "All sample work-hour temperatures are above 40°F.";
-        }
-        if (day.rating === "Caution") {
-          return "At least one sample work-hour temperature is from 33°F to 40°F.";
-        }
-        return "At least one sample work-hour temperature is 32°F or lower.";
+      if (dailyValues.length === 0 || dailyValues.some(function (value) {
+        return typeof value !== "number" || !Number.isFinite(value);
+      })) {
+        return null;
       }
 
-      if (day.rating === "Go") {
-        return "The maximum sample precipitation probability is below 20%.";
+      return dailyValues;
+    }
+
+    function getDailyMaximum(values, hourIndices) {
+      const dailyValues = getValuesForDay(values, hourIndices);
+      return dailyValues === null ? null : Math.max.apply(null, dailyValues);
+    }
+
+    function getDailyTotal(values, hourIndices) {
+      const dailyValues = getValuesForDay(values, hourIndices);
+      if (dailyValues === null) {
+        return null;
       }
-      if (day.rating === "Caution") {
-        return "The maximum sample precipitation probability is from 20% to 50%.";
-      }
-      return "The maximum sample precipitation probability is above 50%.";
+
+      return dailyValues.reduce(function (total, value) {
+        return total + value;
+      }, 0);
     }
 
     function renderForecast() {
       forecastGrid.innerHTML = "";
 
-      forecast.forEach(function (day, index) {
+      forecastDays.forEach(function (day, index) {
         const card = document.createElement("button");
         card.type = "button";
         card.className = "forecast-card";
         if (index === selectedDayIndex) {
           card.classList.add("selected");
         }
-        card.setAttribute("aria-label", day.fullDate + ": " + day.rating);
+        card.setAttribute("aria-label", formatDate(day.date) + ": forecast, not rated");
 
-        card.innerHTML =
-          '<span class="forecast-date">' + day.date + '<br>' + day.fullDate + '</span>' +
-          '<span class="temperature">' + day.high + '° / ' + day.low + '°F</span>' +
-          '<span class="rating ' + getRatingClass(day.rating) + '">' + day.rating + '</span>' +
-          '<span class="card-weather">' + day.sustainedWind + ' mph wind</span>' +
-          '<span class="card-weather">' + day.precipitation + '% precipitation</span>';
+        const dateLabel = document.createElement("span");
+        dateLabel.className = "forecast-date";
+        dateLabel.textContent = formatDate(day.date);
+        card.appendChild(dateLabel);
+
+        const temperature = document.createElement("span");
+        temperature.className = "temperature";
+        temperature.textContent =
+          formatMeasurement(day.high, 1, "°F") + " / " +
+          formatMeasurement(day.low, 1, "°F");
+        card.appendChild(temperature);
+
+        const rating = document.createElement("span");
+        rating.className = "rating rating-pending";
+        rating.textContent = "Not rated yet";
+        card.appendChild(rating);
+
+        addCardWeather(card, "Wind: " + formatMeasurement(day.maxWind, 1, " mph"));
+        addCardWeather(card, "Gusts: " + formatMeasurement(day.maxGust, 1, " mph"));
+        addCardWeather(card, "Max precipitation chance: " +
+          formatMeasurement(day.maxPrecipitationProbability, 0, "%"));
+        addCardWeather(card, "Precipitation: " +
+          formatMeasurement(day.totalPrecipitation, 2, " in"));
 
         card.addEventListener("click", function () {
           selectedDayIndex = index;
@@ -505,24 +491,226 @@
       });
     }
 
-    function renderDetails() {
-      const day = forecast[selectedDayIndex];
-      const explanation = getActivityExplanation(day);
+    function addCardWeather(card, text) {
+      const detail = document.createElement("span");
+      detail.className = "card-weather";
+      detail.textContent = text;
+      card.appendChild(detail);
+    }
 
-      detailsContent.innerHTML =
-        '<h3>' + day.fullDate + ' - ' + activitySelect.value + '</h3>' +
-        '<p><span class="rating ' + getRatingClass(day.rating) + '">' + day.rating + '</span></p>' +
-        '<div class="details-grid">' +
-          '<div class="detail-item"><strong>Temperature</strong>' + day.high + '°F high / ' + day.low + '°F low</div>' +
-          '<div class="detail-item"><strong>Wind</strong>' + day.sustainedWind + ' mph sustained / ' + day.gust + ' mph gust</div>' +
-          '<div class="detail-item"><strong>Precipitation</strong>' + day.precipitation + '% chance</div>' +
-        '</div>' +
-        '<p><strong>Why this rating:</strong> ' + explanation + '</p>' +
-        '<p><strong>Sample work hours:</strong> 7:00 AM to 5:00 PM</p>';
+    function formatDate(dateString) {
+      const date = new Date(dateString + "T12:00:00");
+      return new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric"
+      }).format(date);
+    }
+
+    function addDetailItem(grid, label, value) {
+      const item = document.createElement("div");
+      item.className = "detail-item";
+
+      const heading = document.createElement("strong");
+      heading.textContent = label;
+      item.appendChild(heading);
+      item.appendChild(document.createTextNode(value));
+      grid.appendChild(item);
+    }
+
+    function renderDetails() {
+      detailsContent.innerHTML = "";
+
+      const day = forecastDays[selectedDayIndex];
+      if (!day) {
+        detailsContent.textContent = "Select a jobsite on the map to view forecast details.";
+        return;
+      }
+
+      const heading = document.createElement("h3");
+      heading.textContent = formatDate(day.date) + " - " + activitySelect.value;
+      detailsContent.appendChild(heading);
+
+      const rating = document.createElement("p");
+      rating.className = "rating rating-pending";
+      rating.textContent = "Activity ratings will be added in Stage 4.";
+      detailsContent.appendChild(rating);
+
+      const summary = document.createElement("div");
+      summary.className = "details-grid";
+      addDetailItem(summary, "Temperature",
+        formatMeasurement(day.high, 1, "°F") + " high / " +
+        formatMeasurement(day.low, 1, "°F") + " low");
+      addDetailItem(summary, "Maximum wind", formatMeasurement(day.maxWind, 1, " mph"));
+      addDetailItem(summary, "Maximum gust", formatMeasurement(day.maxGust, 1, " mph"));
+      addDetailItem(summary, "Maximum precipitation chance",
+        formatMeasurement(day.maxPrecipitationProbability, 0, "%"));
+      addDetailItem(summary, "Total precipitation",
+        formatMeasurement(day.totalPrecipitation, 2, " inches"));
+      detailsContent.appendChild(summary);
+
+      const timezone = document.createElement("p");
+      timezone.textContent = "Hourly times are local to the jobsite (" + forecastTimezone + ").";
+      detailsContent.appendChild(timezone);
+
+      const hourlyHeading = document.createElement("h4");
+      hourlyHeading.textContent = "Hourly forecast";
+      detailsContent.appendChild(hourlyHeading);
+
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "hourly-table-wrap";
+      const table = document.createElement("table");
+      table.className = "hourly-table";
+      const tableHead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      ["Time", "Temperature (°F)", "Wind (mph)", "Gusts (mph)",
+        "Precipitation chance", "Precipitation (inches)"].forEach(function (label) {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = label;
+        headerRow.appendChild(cell);
+      });
+      tableHead.appendChild(headerRow);
+      table.appendChild(tableHead);
+
+      const tableBody = document.createElement("tbody");
+      day.hours.forEach(function (hour) {
+        const row = document.createElement("tr");
+        const values = [
+          hour.time.slice(11, 16),
+          formatMeasurement(hour.temperature, 1, "°F"),
+          formatMeasurement(hour.wind, 1, " mph"),
+          formatMeasurement(hour.gust, 1, " mph"),
+          formatMeasurement(hour.precipitationProbability, 0, "%"),
+          formatMeasurement(hour.precipitation, 2, " inches")
+        ];
+        values.forEach(function (value) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        tableBody.appendChild(row);
+      });
+      table.appendChild(tableBody);
+      tableWrap.appendChild(table);
+      detailsContent.appendChild(tableWrap);
+    }
+
+    function createForecastDays(data) {
+      const hourly = data.hourly;
+      return data.daily.time.map(function (date, dayIndex) {
+        const hourIndices = [];
+        hourly.time.forEach(function (time, hourIndex) {
+          if (typeof time === "string" && time.startsWith(date)) {
+            hourIndices.push(hourIndex);
+          }
+        });
+
+        const hours = hourIndices.map(function (hourIndex) {
+          return {
+            time: hourly.time[hourIndex],
+            temperature: hourly.temperature_2m[hourIndex],
+            wind: hourly.wind_speed_10m[hourIndex],
+            gust: hourly.wind_gusts_10m[hourIndex],
+            precipitationProbability: hourly.precipitation_probability[hourIndex],
+            precipitation: hourly.precipitation[hourIndex]
+          };
+        });
+
+        return {
+          date: date,
+          high: data.daily.temperature_2m_max[dayIndex],
+          low: data.daily.temperature_2m_min[dayIndex],
+          maxWind: getDailyMaximum(hourly.wind_speed_10m, hourIndices),
+          maxGust: getDailyMaximum(hourly.wind_gusts_10m, hourIndices),
+          maxPrecipitationProbability:
+            getDailyMaximum(hourly.precipitation_probability, hourIndices),
+          totalPrecipitation: getDailyTotal(hourly.precipitation, hourIndices),
+          hours: hours
+        };
+      });
+    }
+
+    async function loadForecast(location) {
+      if (activeForecastRequest !== null) {
+        activeForecastRequest.abort();
+      }
+
+      const requestController = new AbortController();
+      activeForecastRequest = requestController;
+      forecastDays = [];
+      selectedDayIndex = 0;
+      forecastTimezone = "";
+      forecastStatus.className = "forecast-status";
+      forecastStatus.textContent = "Loading the 7-day forecast for this jobsite...";
+      renderForecast();
+      renderDetails();
+
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.searchParams.set("latitude", location.lat);
+      url.searchParams.set("longitude", location.lng);
+      url.searchParams.set("hourly",
+        "temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability,precipitation");
+      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
+      url.searchParams.set("temperature_unit", "fahrenheit");
+      url.searchParams.set("wind_speed_unit", "mph");
+      url.searchParams.set("precipitation_unit", "inch");
+      url.searchParams.set("timezone", "auto");
+      url.searchParams.set("forecast_days", "7");
+      const requestTimeout = setTimeout(function () {
+        requestController.abort();
+      }, 15000);
+
+      try {
+        const response = await fetch(url, { signal: requestController.signal });
+        if (!response.ok) {
+          throw new Error("Weather service returned HTTP " + response.status + ".");
+        }
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.reason || "Weather service returned an error.");
+        }
+        if (!data.hourly || !data.daily ||
+            !Array.isArray(data.hourly.time) ||
+            !Array.isArray(data.hourly.temperature_2m) ||
+            !Array.isArray(data.hourly.wind_speed_10m) ||
+            !Array.isArray(data.hourly.wind_gusts_10m) ||
+            !Array.isArray(data.hourly.precipitation_probability) ||
+            !Array.isArray(data.hourly.precipitation) ||
+            !Array.isArray(data.daily.time) ||
+            !Array.isArray(data.daily.temperature_2m_max) ||
+            !Array.isArray(data.daily.temperature_2m_min) ||
+            data.daily.time.length !== 7) {
+          throw new Error("Weather service returned an incomplete 7-day forecast.");
+        }
+
+        if (activeForecastRequest !== requestController) {
+          return;
+        }
+
+        forecastDays = createForecastDays(data);
+        forecastTimezone = data.timezone || "jobsite local time";
+        forecastStatus.textContent = "";
+        renderForecast();
+        renderDetails();
+      } catch (error) {
+        if (activeForecastRequest !== requestController) {
+          return;
+        }
+
+        forecastDays = [];
+        forecastStatus.className = "forecast-status error";
+        forecastStatus.textContent =
+          "Weather data could not be retrieved. Please check your internet connection and try again.";
+        renderForecast();
+        renderDetails();
+      } finally {
+        clearTimeout(requestTimeout);
+      }
     }
 
     activitySelect.addEventListener("change", function () {
-      renderForecast();
       renderDetails();
     });
 
