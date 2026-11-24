@@ -120,31 +120,36 @@
       font-size: 0.9rem;
     }
 
-    .work-hours {
+    .work-hours,
+    .crane-limits {
       margin: 16px 0 0;
       padding: 12px;
       border: 1px solid var(--border);
       border-radius: 6px;
     }
 
-    .work-hours legend {
+    .work-hours legend,
+    .crane-limits legend {
       padding: 0 4px;
       color: var(--navy);
       font-weight: bold;
     }
 
-    .work-hours-fields {
+    .work-hours-fields,
+    .crane-limit-fields {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
 
-    .work-hours label {
+    .work-hours label,
+    .crane-limits label {
       margin-bottom: 5px;
       font-size: 0.9rem;
     }
 
-    .work-hours input {
+    .work-hours input,
+    .crane-limits input {
       width: 100%;
       min-height: 40px;
       padding: 8px;
@@ -154,7 +159,8 @@
       font: inherit;
     }
 
-    .work-hours-error {
+    .work-hours-error,
+    .crane-limit-error {
       min-height: 1.5em;
       margin: 8px 0 0;
       color: var(--red);
@@ -524,6 +530,20 @@
           </div>
           <p id="workHoursError" class="work-hours-error" role="alert" aria-live="polite"></p>
         </fieldset>
+        <fieldset class="crane-limits" aria-describedby="craneLimitError">
+          <legend>Crane lift wind limits</legend>
+          <div class="crane-limit-fields">
+            <div>
+              <label for="craneWindLimit">Sustained wind (mph)</label>
+              <input id="craneWindLimit" type="number" step="any" value="20" required>
+            </div>
+            <div>
+              <label for="craneGustLimit">Wind gust (mph)</label>
+              <input id="craneGustLimit" type="number" step="any" value="25" required>
+            </div>
+          </div>
+          <p id="craneLimitError" class="crane-limit-error" role="alert" aria-live="polite"></p>
+        </fieldset>
         <p class="activity-note">Select a location on the map to load its forecast and activity ratings.</p>
       </div>
     </section>
@@ -569,10 +589,13 @@
     const workStartInput = document.getElementById("workStart");
     const workEndInput = document.getElementById("workEnd");
     const workHoursError = document.getElementById("workHoursError");
+    const craneWindLimitInput = document.getElementById("craneWindLimit");
+    const craneGustLimitInput = document.getElementById("craneGustLimit");
+    const craneLimitError = document.getElementById("craneLimitError");
     let workStartMinutes = 7 * 60;
     let workEndMinutes = 17 * 60;
-    const CRANE_WIND_LIMIT = 20;
-    const CRANE_GUST_LIMIT = 25;
+    let craneWindLimit = 20;
+    let craneGustLimit = 25;
     let selectedDayIndex = 0;
     let forecastDays = [];
     let forecastTimezone = "";
@@ -657,6 +680,30 @@
       workEndInput.setAttribute("aria-invalid", String(inputsAreInvalid));
     }
 
+    function updateCraneLimits() {
+      const windValue = craneWindLimitInput.value.trim();
+      const gustValue = craneGustLimitInput.value.trim();
+      const windLimit = Number(windValue);
+      const gustLimit = Number(gustValue);
+      const invalid = windValue === "" || gustValue === "" ||
+        !Number.isFinite(windLimit) || !Number.isFinite(gustLimit) ||
+        windLimit <= 0 || gustLimit <= 0;
+
+      if (invalid) {
+        craneLimitError.textContent =
+          "Enter sustained wind and gust limits as numbers greater than zero. Ratings will keep using the previous valid limits.";
+      } else {
+        craneWindLimit = windLimit;
+        craneGustLimit = gustLimit;
+        craneLimitError.textContent = "";
+        renderForecast();
+        renderDetails();
+      }
+
+      craneWindLimitInput.setAttribute("aria-invalid", String(invalid));
+      craneGustLimitInput.setAttribute("aria-invalid", String(invalid));
+    }
+
     function getRatingClass(rating) {
       if (rating === "Go") {
         return "rating-go";
@@ -734,16 +781,16 @@
 
         const highestWind = Math.max.apply(null, windSpeeds);
         const highestGust = Math.max.apply(null, gustSpeeds);
-        const windCautionLimit = CRANE_WIND_LIMIT * 0.8;
-        const gustCautionLimit = CRANE_GUST_LIMIT * 0.8;
+        const windCautionLimit = craneWindLimit * 0.8;
+        const gustCautionLimit = craneGustLimit * 0.8;
         const noGoReasons = [];
-        if (highestWind >= CRANE_WIND_LIMIT) {
+        if (highestWind >= craneWindLimit) {
           noGoReasons.push("highest sustained wind was " + formatNumber(highestWind, 2) +
-            " mph, reaching or exceeding the " + CRANE_WIND_LIMIT + " mph limit");
+            " mph, reaching or exceeding the " + craneWindLimit + " mph limit");
         }
-        if (highestGust >= CRANE_GUST_LIMIT) {
+        if (highestGust >= craneGustLimit) {
           noGoReasons.push("highest gust was " + formatNumber(highestGust, 2) +
-            " mph, reaching or exceeding the " + CRANE_GUST_LIMIT + " mph limit");
+            " mph, reaching or exceeding the " + craneGustLimit + " mph limit");
         }
         if (noGoReasons.length > 0) {
           return {
@@ -757,9 +804,9 @@
             rating: "Caution",
             explanation: "Caution: highest sustained wind was " + formatNumber(highestWind, 2) +
               " mph (Caution at " + formatNumber(windCautionLimit, 2) + " mph; No-Go at " +
-              CRANE_WIND_LIMIT + " mph), and highest gust was " + formatNumber(highestGust, 2) +
+              craneWindLimit + " mph), and highest gust was " + formatNumber(highestGust, 2) +
               " mph (Caution at " + formatNumber(gustCautionLimit, 2) +
-              " mph; No-Go at " + CRANE_GUST_LIMIT + " mph)."
+              " mph; No-Go at " + craneGustLimit + " mph)."
           };
         }
 
@@ -1385,6 +1432,8 @@
 
     workStartInput.addEventListener("change", updateWorkHours);
     workEndInput.addEventListener("change", updateWorkHours);
+    craneWindLimitInput.addEventListener("change", updateCraneLimits);
+    craneGustLimitInput.addEventListener("change", updateCraneLimits);
 
     renderForecast();
     renderDetails();

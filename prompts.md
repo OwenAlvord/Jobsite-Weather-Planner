@@ -2,11 +2,21 @@
 
 This file records the prompts used to plan, build, test, and improve the Jobsite Weather Planner.
 
-## Initial Project Setup
+## Specification Review
 
-- Create a Jobsite Weather Planner web app based on the requirements in spec.md.
-- Follow AGENTS.md and record each new request and prompt throughout the project.
-- Based on the previous specification review, revise spec.md to address missing and unclear requirements. Use Leaflet and OpenStreetMap, show today plus the following six days, include 7:00 AM and exclude 5:00 PM, use the worst hourly rating with No-Go over Caution over Go, mark activity ratings Unavailable for missing required weather data, show a clear weather API error, immediately recalculate when custom work hours change, print a selected day's field brief, reset settings on refresh, and add clear boundary examples and additional validation cases. Do not build the app or create index.html. Update spec.md only and record this request in prompts.md.
+Read my `AGENTS.md` and `spec.md` files. I am building a Jobsite Weather Planner for my CCE 270 assignment.
+
+Please review my specification and tell me:
+
+1. What requirements are missing or unclear?
+2. Are the weather calculations and rating rules specific enough to implement?
+3. Are my two additional features clearly defined?
+4. What changes would you recommend before we start building?
+Do not write any code or change any files yet. Explain your feedback in simple language.
+
+## Specification Revision
+
+Based on your review, please revise my existing spec.md to address the missing and unclear requirements. Keep the project manageable for a beginner CCE 270 student. Use these decisions: 1. Use Leaflet and OpenStreetMap for the map. 2. Show today and the following six days. 3. Default work hours are 7:00 AM to 5:00 PM. Include 7:00 AM but exclude 5:00 PM. 4. The worst hourly rating determines the daily rating. No-Go takes priority over Caution, and Caution takes priority over Go. 5. Missing required weather data makes that activity's daily rating Unavailable. 6. Show a clear error message if the weather API fails. 7. Changing custom work hours immediately recalculates all seven days. 8. The printable field brief uses the selected day's weather information, rating, and explanation. 9. Settings reset to their defaults when the page is refreshed. Add clear boundary examples and additional validation cases for all three activities. Do not build the app or create index.html yet. Update spec.md only, preserve the existing requirements, and record this request in prompts.md. When finished, summarize what you changed.
 
 ## Stage 1 Page Mockup
 
@@ -214,3 +224,29 @@ Requirements:
 Record my exact request in `prompts.md`. Test the print feature and explain how I can check the report before printing.
 
 Do not commit anything yet.
+
+## Final Review Before Publishing
+
+Read `AGENTS.md` and `spec.md`.
+
+Perform a final review of the Jobsite Weather Planner before publishing.
+
+Check the following:
+
+1. All required features in `spec.md` are implemented.
+2. The interactive map works.
+3. The seven-day Open-Meteo forecast works and updates when the location changes.
+4. Crane Lifts, Concrete Pours, and Roofing ratings work correctly.
+5. Custom Crew Work Hours works and recalculates ratings.
+6. Printable Daily Field Brief includes all required information and prints correctly.
+7. Error handling and missing-weather-data behavior work.
+8. The app works on desktop and mobile screen sizes.
+9. `index.html`, `spec.md`, and `prompts.md` are present and complete.
+10. `prompts.md` contains the exact prompts used throughout development.
+Fix any remaining issues you find. Do not add new features or change the approved requirements.
+
+Record my exact request in `prompts.md`.
+
+At the end, give me a checklist of what passed, anything you fixed, and whether the project is ready to publish.
+
+Do not commit anything or publish the app yet.
